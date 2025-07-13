@@ -2,143 +2,156 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Animal Cloud</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: Arial, sans-serif;
       margin: 0;
-      background: linear-gradient(to top, #e0f7fa, #ffffff);
-      color: #333;
-    }
-    header {
+      padding: 0;
       text-align: center;
-      padding: 2rem 1rem;
-      background: #4dd0e1;
-      color: white;
-      font-size: 1.8rem;
+      background: #e0f7fa;
     }
-    main {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2rem;
+    #cameraView, #previewSection, #gallerySection {
+      display: none;
+      padding: 1rem;
+    }
+    canvas, video, img {
+      max-width: 90vw;
+      border-radius: 12px;
     }
     button {
-      padding: 1rem 2rem;
-      margin: 1rem;
-      font-size: 1.2rem;
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
       border: none;
-      border-radius: 1rem;
-      background: #00796b;
+      background-color: #4caf50;
       color: white;
+      border-radius: 10px;
       cursor: pointer;
     }
-    .camera-view, .image-preview, .gallery {
-      width: 90%;
-      max-width: 500px;
-      margin-top: 2rem;
-      display: none;
-      border: 2px dashed #ccc;
-      padding: 1rem;
-      text-align: center;
-    }
-    video, img {
-      max-width: 100%;
-      border-radius: 1rem;
+    #galleryImages img {
+      width: 100px;
+      margin: 5px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
     }
   </style>
 </head>
 <body>
-  <header>Animal Cloud</header>
-  <main>
-    <button onclick="showCamera()">📷 Point to the Sky</button>
+  <h1>🌤️ Animal Cloud</h1>
+  <div id="homeScreen">
+    <button onclick="startCamera()">📷 Point to the Sky</button>
     <button onclick="showGallery()">🖼️ View Saved Animals</button>
+  </div>
 
-    <div class="camera-view" id="cameraView">
-      <video id="video" autoplay playsinline></video>
-      <button onclick="switchCamera()">🔄 Switch Camera</button>
-      <button onclick="captureImage()">Detect Animal</button>
-    </div>
+  <div id="cameraView">
+    <video id="video" autoplay playsinline></video><br>
+    <button onclick="switchCamera()">🔄 Switch Camera</button>
+    <button onclick="capturePhoto()">🐾 Detect Animal</button>
+    <button onclick="goHome()">⬅️ Back</button>
+  </div>
 
-    <div class="image-preview" id="imagePreview">
-      <p>Here's the animal the AI found:</p>
-      <img id="capturedImage" src="" alt="Animal Outline">
-      <p>Looks like a cat!</p>
-      <button onclick="alert('Saved!')">💾 Save</button>
-    </div>
+  <div id="previewSection">
+    <canvas id="canvas" width="640" height="480"></canvas><br>
+    <p id="animalName"></p>
+    <button onclick="saveImage()">💾 Save</button>
+    <button onclick="goHome()">⬅️ Back</button>
+  </div>
 
-    <div class="gallery" id="gallery">
-      <p>Your saved cloud animals would appear here.</p>
-    </div>
-  </main>
+  <div id="gallerySection">
+    <h2>Saved Cloud Animals</h2>
+    <div id="galleryImages"></div>
+    <button onclick="goHome()">⬅️ Back</button>
+  </div>
 
   <script>
-    let video = null;
-    let stream = null;
+    let currentStream = null;
     let usingFrontCamera = false;
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    const animalNameEl = document.getElementById('animalName');
+    const animals = ["Elephant", "Dolphin", "Giraffe", "Cat", "Bird", "Rabbit"];
 
-    function showCamera() {
-      document.getElementById('cameraView').style.display = 'block';
-      document.getElementById('imagePreview').style.display = 'none';
-      document.getElementById('gallery').style.display = 'none';
-      startCamera();
+    function goHome() {
+      stopCamera();
+      document.getElementById('homeScreen').style.display = 'block';
+      document.getElementById('cameraView').style.display = 'none';
+      document.getElementById('previewSection').style.display = 'none';
+      document.getElementById('gallerySection').style.display = 'none';
     }
 
     function startCamera() {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-
-      video = document.getElementById('video');
+      document.getElementById('homeScreen').style.display = 'none';
+      document.getElementById('cameraView').style.display = 'block';
       const constraints = {
         video: {
-          facingMode: usingFrontCamera ? 'user' : 'environment'
+          facingMode: usingFrontCamera ? "user" : "environment"
         }
       };
-
       navigator.mediaDevices.getUserMedia(constraints)
-        .then(s => {
-          stream = s;
+        .then(stream => {
+          currentStream = stream;
           video.srcObject = stream;
-        })
-        .catch(err => {
-          alert('Camera access denied or not available.');
-          console.error(err);
         });
+    }
+
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
     }
 
     function switchCamera() {
       usingFrontCamera = !usingFrontCamera;
+      stopCamera();
       startCamera();
     }
 
-    function captureImage() {
-      const canvas = document.createElement('canvas');
+    function capturePhoto() {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0);
-      const imageUrl = canvas.toDataURL('image/png');
-      document.getElementById('capturedImage').src = imageUrl;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Simulate AI animal detection
+      const animal = animals[Math.floor(Math.random() * animals.length)];
+      animalNameEl.textContent = `We found a ${animal}!`;
+
+      // Draw a fake outline (for now just an emoji or circle)
+      context.strokeStyle = "red";
+      context.lineWidth = 4;
+      context.beginPath();
+      context.arc(canvas.width / 2, canvas.height / 2, 100, 0, 2 * Math.PI);
+      context.stroke();
 
       document.getElementById('cameraView').style.display = 'none';
-      document.getElementById('imagePreview').style.display = 'block';
+      document.getElementById('previewSection').style.display = 'block';
+    }
 
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+    function saveImage() {
+      const dataURL = canvas.toDataURL("image/png");
+      const name = animalNameEl.textContent;
+      const saved = JSON.parse(localStorage.getItem("animalGallery") || "[]");
+      saved.push({ image: dataURL, label: name });
+      localStorage.setItem("animalGallery", JSON.stringify(saved));
+      alert("Saved to gallery!");
     }
 
     function showGallery() {
-      document.getElementById('cameraView').style.display = 'none';
-      document.getElementById('imagePreview').style.display = 'none';
-      document.getElementById('gallery').style.display = 'block';
-
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      const container = document.getElementById('galleryImages');
+      container.innerHTML = "";
+      const saved = JSON.parse(localStorage.getItem("animalGallery") || "[]");
+      saved.forEach(entry => {
+        const img = document.createElement("img");
+        img.src = entry.image;
+        img.title = entry.label;
+        container.appendChild(img);
+      });
+      document.getElementById('homeScreen').style.display = 'none';
+      document.getElementById('gallerySection').style.display = 'block';
     }
+
+    goHome(); // Initialize view
   </script>
 </body>
 </html>
