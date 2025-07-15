@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Animal Cloud</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      background: #e0f7fa;
+    }
+    #cameraView, #gallerySection {
+      display: none;
+      padding: 1rem;
+    }
+    canvas, video, img {
+      max-width: 90vw;
+      border-radius: 12px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      background-color: #4caf50;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    #galleryImages img {
+      width: 100px;
+      margin: 5px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌤️ Animal Cloud</h1>
+  <div id="homeScreen">
+    <button onclick="startCamera()">📷 Point to the Sky</button>
+    <button onclick="showGallery()">🖼️ View Saved Animals</button>
+  </div>
+
+  <div id="cameraView">
+    <video id="video" autoplay playsinline style="display:none;"></video>
+    <canvas id="canvas"></canvas><br>
+    <p id="predictionLabel"></p>
+    <button onclick="switchCamera()">🔄 Switch Camera</button>
+    <button onclick="capturePhoto()">💾 Save Snapshot</button>
+    <button onclick="goHome()">⬅️ Back</button>
+  </div>
+
+  <div id="gallerySection">
+    <h2>Saved Cloud Animals</h2>
+    <div id="galleryImages"></div>
+    <button onclick="goHome()">⬅️ Back</button>
+  </div>
+
+  <script>
+    let currentStream = null;
+    let usingFrontCamera = false;
+    let video = document.getElementById('video');
+    let canvas = document.getElementById('canvas');
+    let context = canvas.getContext('2d');
+    let overlayInterval;
+    let model = null;
+
+    const predictionLabel = document.getElementById('predictionLabel');
+
+    async function loadModel() {
+      model = await mobilenet.load();
+      console.log("MobileNet model loaded.");
+    }
+
+    async function classifyFrame() {
+      if (!model) return;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageTensor = tf.browser.fromPixels(canvas);
+      const predictions = await model.classify(imageTensor);
+      imageTensor.dispose();
+
+      const result = predictions[0];
+      predictionLabel.textContent = `🤖 ${result.className} (${(result.probability * 100).toFixed(1)}%)`;
+
+      // Draw overlay if the prediction matches an animal
+      const isAnimal = /dog|cat|elephant|squirrel|rabbit|bird|horse|zebra/i.test(result.className);
+      if (isAnimal) {
+        context.strokeStyle = "red";
+        context.lineWidth = 4;
+        context.beginPath();
+        context.arc(canvas.width / 2, canvas.height / 2, 100, 0, 2 * Math.PI);
+        context.stroke();
+
+        context.font = "28px Arial";
+        context.fillStyle = "red";
+        context.fillText(result.className, canvas.width / 2 - 60, canvas.height / 2 - 120);
+      } else {
+        context.font = "60px Arial";
+        context.fillText("🐶", canvas.width / 2 - 30, canvas.height / 2);
+      }
+    }
+
+    function goHome() {
+      stopCamera();
+      clearInterval(overlayInterval);
+      document.getElementById('homeScreen').style.display = 'block';
+      document.getElementById('cameraView').style.display = 'none';
+      document.getElementById('gallerySection').style.display = 'none';
+    }
+
+    function startCamera() {
+      document.getElementById('homeScreen').style.display = 'none';
+      document.getElementById('cameraView').style.display = 'block';
+      const constraints = {
+        video: {
+          facingMode: usingFrontCamera ? "user" : "environment"
+        }
+      };
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+          currentStream = stream;
+          video.srcObject = stream;
+          video.onloadedmetadata = () => {
+            video.play();
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            overlayInterval = setInterval(classifyFrame, 1500);
+          }
+        });
+    }
+
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+    }
+
+    function switchCamera() {
+      usingFrontCamera = !usingFrontCamera;
+      stopCamera();
+      clearInterval(overlayInterval);
+      startCamera();
+    }
+
+    function capturePhoto() {
+      const dataURL = canvas.toDataURL("image/png");
+      const saved = JSON.parse(localStorage.getItem("animalGallery") || "[]");
+      saved.push({ image: dataURL });
+      localStorage.setItem("animalGallery", JSON.stringify(saved));
+      alert("Saved to gallery!");
+    }
+
+    function showGallery() {
+      const container = document.getElementById('galleryImages');
+      container.innerHTML = "";
+      const saved = JSON.parse(localStorage.getItem("animalGallery") || "[]");
+      saved.forEach(entry => {
+        const img = document.createElement("img");
+        img.src = entry.image;
+        container.appendChild(img);
+      });
+      document.getElementById('homeScreen').style.display = 'none';
+      document.getElementById('gallerySection').style.display = 'block';
+    }
+
+    loadModel();
+    goHome();
+  </script>
+</body>
+</html>
